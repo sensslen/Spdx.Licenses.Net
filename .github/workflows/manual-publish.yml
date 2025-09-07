@@ -1,0 +1,43 @@
+name: Manual Publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run download-licenses.ps1
+        shell: pwsh
+        run: ./download-licenses.ps1
+
+      - name: Run create-csharp-project.ps1
+        shell: pwsh
+        run: ./create-csharp-project.ps1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Spdx.Licenses/Spdx.Licenses.csproj
+
+      - name: Build project
+        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore
+
+      - name: Pack NuGet package
+        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build --output ./nupkg
+
+      - name: Publish to NuGet
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./nupkg/*.nupkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
