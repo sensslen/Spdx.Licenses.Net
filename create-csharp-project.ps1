@@ -57,6 +57,7 @@ $csprojContent = $csprojContent -replace '</Project>', @"
       <Pack>true</Pack>
       <PackagePath>README.md</PackagePath>
     </Content>
+    <EmbeddedResource Include="Licenses\*.txt" />
   </ItemGroup>
 </Project>
 "@
@@ -87,15 +88,6 @@ namespace $projectName
 "@
 Set-Content (Join-Path $projectName "ILicense.cs") $interfaceCode
 
-function ConvertTo-CSharpIndentedRawString {
-    param([string]$text, [int]$indent = 12)
-    $indentStr = ' ' * $indent
-    $lines = $text -split "`r?`n"
-    $escapedLines = $lines | ForEach-Object { $indentStr + $_ }
-    $joined = ($escapedLines -join "`n")
-    return $joined
-}
-
 # Generate each license class
 $licenseClassNames = @()
 foreach ($license in $licenses) {
@@ -109,8 +101,6 @@ foreach ($license in $licenses) {
     $isOsiApproved = if ($license.isOsiApproved) { 'true' } else { 'false' }
     $idRaw = '"""' + $id + '"""'
     $nameRaw = '"""' + $name + '"""'
-    $licenseTextIndented = ConvertTo-CSharpIndentedRawString $license.licenseText 12
-    $standardLicenseTemplatetIndented = ConvertTo-CSharpIndentedRawString $license.standardLicenseTemplate 12
     $classCode = @"
 namespace $projectName.Licenses
 {
@@ -121,18 +111,23 @@ namespace $projectName.Licenses
         public bool IsDeprecated => $isDeprecated;
         public bool IsFsfLibre => $isFsfLibre;
         public bool IsOsiApproved => $isOsiApproved;
-        public string LicenseText =>
-            """"""
-$licenseTextIndented
-            """""";
-        public string StandardLicenseTemplate =>
-            """"""
-$standardLicenseTemplatetIndented
-            """""";
+        public string LicenseText => ReadResource("$projectName.Licenses.$className.LicenseText.txt");
+        public string StandardLicenseTemplate => ReadResource("$projectName.Licenses.$className.StandardLicenseTemplate.txt");
+
+        private static string ReadResource(string resourceName)
+        {
+            var assembly = typeof($className).Assembly;
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null) return string.Empty;
+            using var reader = new System.IO.StreamReader(stream);
+            return reader.ReadToEnd();
+        }
     }
 }
 "@
     Set-Content (Join-Path $licensesFolderPath "$className.cs") $classCode
+    Set-Content (Join-Path $licensesFolderPath "$className.LicenseText.txt") $license.licenseText
+    Set-Content (Join-Path $licensesFolderPath "$className.StandardLicenseTemplate.txt") $license.standardLicenseTemplate
 }
 
 # Write main SpdxLicenseStore class referencing all license classes
