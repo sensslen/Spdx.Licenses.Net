@@ -81,6 +81,7 @@ namespace $projectName
         bool IsFsfLibre { get; }
         bool IsOsiApproved { get; }
         string LicenseText { get; }
+        string StandardLicenseTemplate { get; }
     }
 }
 "@
@@ -109,6 +110,7 @@ foreach ($license in $licenses) {
     $idRaw = '"""' + $id + '"""'
     $nameRaw = '"""' + $name + '"""'
     $licenseTextIndented = ConvertTo-CSharpIndentedRawString $license.licenseText 12
+    $standardLicenseTemplatetIndented = ConvertTo-CSharpIndentedRawString $license.standardLicenseTemplate 12
     $classCode = @"
 namespace $projectName.Licenses
 {
@@ -122,6 +124,10 @@ namespace $projectName.Licenses
         public string LicenseText =>
             """"""
 $licenseTextIndented
+            """""";
+        public string StandardLicenseTemplate =>
+            """"""
+$standardLicenseTemplatetIndented
             """""";
     }
 }
