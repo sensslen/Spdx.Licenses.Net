@@ -49,6 +49,7 @@ $csprojContent = $csprojContent -replace '  </PropertyGroup>', @"
     <PackageId>Sensslen.SPDX.Licenses.Net</PackageId>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 "@
 $csprojContent = $csprojContent -replace '</Project>', @"
