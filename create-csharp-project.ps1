@@ -39,7 +39,7 @@ dotnet add $projectName package System.Collections.Immutable
 # Set version in csproj
 $csprojPath = Join-Path $projectName $csprojName
 $csprojContent = Get-Content $csprojPath
-$csprojContent = $csprojContent -replace '</PropertyGroup>', @"
+$csprojContent = $csprojContent -replace '  </PropertyGroup>', @"
     <Version>$licenseListVersion</Version>
     <LangVersion>12</LangVersion>
     <Authors>Simon Ensslen</Authors>
@@ -48,8 +48,19 @@ $csprojContent = $csprojContent -replace '</PropertyGroup>', @"
     <Nullable>enable</Nullable>
     <PackageId>Sensslen.SPDX.Licenses.Net</PackageId>
     <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 "@
+$csprojContent = $csprojContent -replace '</Project>', @"
+  <ItemGroup>
+    <Content Include="..\README.md">
+      <Pack>true</Pack>
+      <PackagePath>README.md</PackagePath>
+    </Content>
+  </ItemGroup>
+</Project>
+"@
+
 Set-Content $csprojPath $csprojContent
 
 # Create Licenses subfolder for per-license classes
