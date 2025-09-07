@@ -95,7 +95,7 @@ foreach ($license in $licenses) {
     $id = $license.licenseId
     $className = $id -replace '[^A-Za-z0-9_]', '_' # Safe C# identifier
     if ($className -match '^[0-9]') { $className = "License_$className" }
-    $licenseClassNames += $className
+    $licenseClassNames += @{ ID = $license.licenseId; Classname = $className }
     $name = $license.name
     $isDeprecated = if ($license.isDeprecatedLicenseId) { 'true' } else { 'false' }
     $isFsfLibre = if ($null -ne $license.isFsfLibre -and $license.isFsfLibre) { 'true' } else { 'false' }
@@ -133,7 +133,7 @@ namespace $projectName.Licenses
 
 # Write main SpdxLicenseStore class referencing all license classes
 $storeFilePath = Join-Path $projectName "SpdxLicenseStore.cs"
-$dictEntries = $licenseClassNames | ForEach-Object { "            new KeyValuePair<string, ILicense>(`"$($_)`", new Licenses.$($_)())" }
+$dictEntries = $licenseClassNames | ForEach-Object { "            new KeyValuePair<string, ILicense>(`"$($_.ID)`", new Licenses.$($_.Classname)())" }
 $dictBody = $dictEntries -join ",`n"
 $storeCode = @"
 using System.Collections.Generic;
