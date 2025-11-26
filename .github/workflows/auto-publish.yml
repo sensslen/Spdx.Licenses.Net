@@ -28,11 +28,40 @@ jobs:
         id: nuget
         shell: pwsh
         run: |
+          function Get-BaseVersion {
+            param([string]$version)
+            # Strip prerelease suffix (e.g., "3.26-beta" -> "3.26")
+            $baseVersion = $version -replace '-.*$', ''
+            return $baseVersion
+          }
+          
+          function Compare-SemVer {
+            param([string]$v1, [string]$v2)
+            $base1 = Get-BaseVersion $v1
+            $base2 = Get-BaseVersion $v2
+            $parsed1 = $null
+            $parsed2 = $null
+            if (-not [System.Version]::TryParse($base1, [ref]$parsed1)) { return $null }
+            if (-not [System.Version]::TryParse($base2, [ref]$parsed2)) { return $null }
+            return $parsed1.CompareTo($parsed2)
+          }
+          
           try {
             $packageId = "Sensslen.SPDX.Licenses.Net"
             $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/$($packageId.ToLower())/index.json"
-            $versions = $response.versions | ForEach-Object { [System.Version]::Parse($_) } | Sort-Object -Descending
-            $latestVersion = $versions[0].ToString()
+            # Filter to only versions that can be parsed, then sort
+            $validVersions = @()
+            foreach ($v in $response.versions) {
+              $baseVersion = Get-BaseVersion $v
+              $parsed = $null
+              if ([System.Version]::TryParse($baseVersion, [ref]$parsed)) {
+                $validVersions += [PSCustomObject]@{ Original = $v; Parsed = $parsed }
+              } else {
+                Write-Host "Skipping unparseable version: $v"
+              }
+            }
+            $sorted = $validVersions | Sort-Object -Property Parsed -Descending
+            $latestVersion = $sorted[0].Original
             Write-Host "Latest NuGet version: $latestVersion"
             "version=$latestVersion" >> $env:GITHUB_OUTPUT
             "exists=true" >> $env:GITHUB_OUTPUT
@@ -46,23 +75,36 @@ jobs:
         id: compare
         shell: pwsh
         run: |
+          function Get-BaseVersion {
+            param([string]$version)
+            # Strip prerelease suffix (e.g., "3.26-beta" -> "3.26")
+            $baseVersion = $version -replace '-.*$', ''
+            return $baseVersion
+          }
+          
           $spdxVersion = "${{ steps.spdx.outputs.version }}"
           $nugetVersion = "${{ steps.nuget.outputs.version }}"
           
           Write-Host "SPDX version: $spdxVersion"
           Write-Host "NuGet version: $nugetVersion"
           
+          $spdxBase = Get-BaseVersion $spdxVersion
+          $nugetBase = Get-BaseVersion $nugetVersion
+          
+          Write-Host "SPDX base version: $spdxBase"
+          Write-Host "NuGet base version: $nugetBase"
+          
           $spdxParsed = $null
           $nugetParsed = $null
           
-          if (-not [System.Version]::TryParse($spdxVersion, [ref]$spdxParsed)) {
-            Write-Host "Failed to parse SPDX version: $spdxVersion"
+          if (-not [System.Version]::TryParse($spdxBase, [ref]$spdxParsed)) {
+            Write-Host "Failed to parse SPDX version: $spdxVersion (base: $spdxBase)"
             "should_publish=false" >> $env:GITHUB_OUTPUT
             exit 0
           }
           
-          if (-not [System.Version]::TryParse($nugetVersion, [ref]$nugetParsed)) {
-            Write-Host "Failed to parse NuGet version: $nugetVersion"
+          if (-not [System.Version]::TryParse($nugetBase, [ref]$nugetParsed)) {
+            Write-Host "Failed to parse NuGet version: $nugetVersion (base: $nugetBase)"
             "should_publish=false" >> $env:GITHUB_OUTPUT
             exit 0
           }
