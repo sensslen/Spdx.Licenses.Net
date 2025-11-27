@@ -1,0 +1,159 @@
+name: Auto Publish
+
+on:
+  schedule:
+    # Run once a day at midnight UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get SPDX license version
+        id: spdx
+        shell: pwsh
+        run: |
+          $licensesData = Invoke-RestMethod -Uri "https://spdx.org/licenses/licenses.json"
+          $spdxVersion = $licensesData.licenseListVersion
+          Write-Host "SPDX license version: $spdxVersion"
+          "version=$spdxVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Get latest NuGet version
+        id: nuget
+        shell: pwsh
+        run: |
+          function Get-BaseVersion {
+            param([string]$version)
+            # Strip prerelease suffix (e.g., "3.26-beta" -> "3.26")
+            $baseVersion = $version -replace '-.*$', ''
+            return $baseVersion
+          }
+          
+          function Compare-SemVer {
+            param([string]$v1, [string]$v2)
+            $base1 = Get-BaseVersion $v1
+            $base2 = Get-BaseVersion $v2
+            $parsed1 = $null
+            $parsed2 = $null
+            if (-not [System.Version]::TryParse($base1, [ref]$parsed1)) { return $null }
+            if (-not [System.Version]::TryParse($base2, [ref]$parsed2)) { return $null }
+            return $parsed1.CompareTo($parsed2)
+          }
+          
+          try {
+            $packageId = "Sensslen.SPDX.Licenses.Net"
+            $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/$($packageId.ToLower())/index.json"
+            # Filter to only versions that can be parsed, then sort
+            $validVersions = @()
+            foreach ($v in $response.versions) {
+              $baseVersion = Get-BaseVersion $v
+              $parsed = $null
+              if ([System.Version]::TryParse($baseVersion, [ref]$parsed)) {
+                $validVersions += [PSCustomObject]@{ Original = $v; Parsed = $parsed }
+              } else {
+                Write-Host "Skipping unparseable version: $v"
+              }
+            }
+            $sorted = $validVersions | Sort-Object -Property Parsed -Descending
+            $latestVersion = $sorted[0].Original
+            Write-Host "Latest NuGet version: $latestVersion"
+            "version=$latestVersion" >> $env:GITHUB_OUTPUT
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } catch {
+            Write-Host "Package not found on NuGet or error fetching: $_"
+            "version=0.0.0" >> $env:GITHUB_OUTPUT
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Compare versions
+        id: compare
+        shell: pwsh
+        run: |
+          function Get-BaseVersion {
+            param([string]$version)
+            # Strip prerelease suffix (e.g., "3.26-beta" -> "3.26")
+            $baseVersion = $version -replace '-.*$', ''
+            return $baseVersion
+          }
+          
+          $spdxVersion = "${{ steps.spdx.outputs.version }}"
+          $nugetVersion = "${{ steps.nuget.outputs.version }}"
+          
+          Write-Host "SPDX version: $spdxVersion"
+          Write-Host "NuGet version: $nugetVersion"
+          
+          $spdxBase = Get-BaseVersion $spdxVersion
+          $nugetBase = Get-BaseVersion $nugetVersion
+          
+          Write-Host "SPDX base version: $spdxBase"
+          Write-Host "NuGet base version: $nugetBase"
+          
+          $spdxParsed = $null
+          $nugetParsed = $null
+          
+          if (-not [System.Version]::TryParse($spdxBase, [ref]$spdxParsed)) {
+            Write-Host "Failed to parse SPDX version: $spdxVersion (base: $spdxBase)"
+            "should_publish=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          
+          if (-not [System.Version]::TryParse($nugetBase, [ref]$nugetParsed)) {
+            Write-Host "Failed to parse NuGet version: $nugetVersion (base: $nugetBase)"
+            "should_publish=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          
+          if ($spdxParsed -gt $nugetParsed) {
+            Write-Host "SPDX version is higher, will publish new version"
+            "should_publish=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "NuGet version is up to date"
+            "should_publish=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Run download-licenses.ps1
+        if: steps.compare.outputs.should_publish == 'true'
+        shell: pwsh
+        run: ./download-licenses.ps1
+
+      - name: Run create-csharp-project.ps1
+        if: steps.compare.outputs.should_publish == 'true'
+        shell: pwsh
+        run: ./create-csharp-project.ps1
+
+      - name: Restore dependencies
+        if: steps.compare.outputs.should_publish == 'true'
+        run: dotnet restore Spdx.Licenses/Spdx.Licenses.csproj
+
+      - name: Build project
+        if: steps.compare.outputs.should_publish == 'true'
+        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore
+
+      - name: Pack NuGet package
+        if: steps.compare.outputs.should_publish == 'true'
+        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build
+
+      - name: Publish to NuGet
+        if: steps.compare.outputs.should_publish == 'true'
+        run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+      - name: Create GitHub Release
+        if: steps.compare.outputs.should_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.spdx.outputs.version }}
+          name: Release v${{ steps.spdx.outputs.version }}
+          body: |
+            Automated release for SPDX License List version ${{ steps.spdx.outputs.version }}
+            
+            This release was automatically generated when a new version of the SPDX license list was detected.
+          files: |
+            **/*.nupkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
