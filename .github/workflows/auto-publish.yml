@@ -9,8 +9,6 @@ on:
 jobs:
   check-and-publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -142,18 +140,3 @@ jobs:
       - name: Publish to NuGet
         if: steps.compare.outputs.should_publish == 'true'
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
-
-      - name: Create GitHub Release
-        if: steps.compare.outputs.should_publish == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.spdx.outputs.version }}
-          name: Release v${{ steps.spdx.outputs.version }}
-          body: |
-            Automated release for SPDX License List version ${{ steps.spdx.outputs.version }}
-            
-            This release was automatically generated when a new version of the SPDX license list was detected.
-          files: |
-            **/*.nupkg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
