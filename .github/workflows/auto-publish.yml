@@ -131,11 +131,11 @@ jobs:
 
       - name: Build project
         if: steps.compare.outputs.should_publish == 'true'
-        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore
+        run: build publish Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Pack NuGet package
         if: steps.compare.outputs.should_publish == 'true'
-        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build
+        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build -p:ContinuousIntegrationBuild=true
 
       - name: Publish to NuGet
         if: steps.compare.outputs.should_publish == 'true'

@@ -22,10 +22,10 @@ jobs:
         run: dotnet restore Spdx.Licenses/Spdx.Licenses.csproj
 
       - name: Build project
-        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore
+        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Pack NuGet package
-        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build
+        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build -p:ContinuousIntegrationBuild=true
 
       - name: Publish to NuGet
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

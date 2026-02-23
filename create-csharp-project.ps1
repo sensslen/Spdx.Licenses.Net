@@ -50,6 +50,7 @@ $csprojContent = $csprojContent -replace '  </PropertyGroup>', @"
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 "@
 $csprojContent = $csprojContent -replace '</Project>', @"
