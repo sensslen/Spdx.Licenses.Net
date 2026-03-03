@@ -32,6 +32,3 @@ Pull requests and issues are welcome. Please ensure any new license data is sour
 
 ## License
 See the `LICENSE` file for details.
-
-## Maintainer
-- GitHub: [sensslen](https://github.com/sensslen)
