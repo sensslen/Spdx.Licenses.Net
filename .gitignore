@@ -416,5 +416,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
-Spdx.Licenses
+Spdx.Licenses/licenses.bin
 SpdxLicenseData

@@ -9,15 +9,27 @@ A .NET library for SPDX license data, including license texts and metadata. This
 
 ## Usage
 
+```csharp
+using Spdx.Licenses;
+
+if (SpdxLicenseStore.Licenses.TryGetValue("MIT", out var license))
+{
+    Console.WriteLine($"{license.Name}: OSI approved {license.IsOsiApproved}");
+    Console.WriteLine(license.LicenseText);
+}
+```
+
+All license texts ship in one compressed resource. A license's text and template are decompressed on first access and cached.
+
 ### Manual Update & Publish
 To manually update and publish the package:
 1. Run `download-licenses.ps1` to fetch the latest SPDX license data.
-2. Run `create-csharp-project.ps1` to generate/update the C# project files.
-3. Build and pack the project:
+2. Run `create-license-resource.ps1` to pack it into `Spdx.Licenses/licenses.bin`.
+3. Build, test and pack, passing the SPDX license list version as the package version:
    ```powershell
-   dotnet restore Spdx.Licenses/Spdx.Licenses.csproj
-   dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release
-   dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --output ./nupkg
+   dotnet build Spdx.Licenses.Net.sln --configuration Release -p:Version=<version>
+   dotnet test Spdx.Licenses.Net.sln --configuration Release --no-build
+   dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build -p:Version=<version> --output ./nupkg
    ```
 4. Publish the NuGet package:
    ```powershell
