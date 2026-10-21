@@ -123,22 +123,32 @@ jobs:
         shell: pwsh
         run: ./download-licenses.ps1
 
-      - name: Run create-csharp-project.ps1
+      - name: Run create-license-resource.ps1
         if: steps.compare.outputs.should_publish == 'true'
         shell: pwsh
-        run: ./create-csharp-project.ps1
+        run: ./create-license-resource.ps1
+
+      - name: Set up .NET
+        if: steps.compare.outputs.should_publish == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Restore dependencies
         if: steps.compare.outputs.should_publish == 'true'
-        run: dotnet restore Spdx.Licenses/Spdx.Licenses.csproj
+        run: dotnet restore Spdx.Licenses.Net.sln
 
-      - name: Build project
+      - name: Build solution
         if: steps.compare.outputs.should_publish == 'true'
-        run: dotnet build Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+        run: dotnet build Spdx.Licenses.Net.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.spdx.outputs.version }}
+
+      - name: Test
+        if: steps.compare.outputs.should_publish == 'true'
+        run: dotnet test Spdx.Licenses.Net.sln --configuration Release --no-build
 
       - name: Pack NuGet package
         if: steps.compare.outputs.should_publish == 'true'
-        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build -p:ContinuousIntegrationBuild=true
+        run: dotnet pack Spdx.Licenses/Spdx.Licenses.csproj --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.spdx.outputs.version }}
 
       - name: NuGet login (OIDC -> temp API key)
         id: login
